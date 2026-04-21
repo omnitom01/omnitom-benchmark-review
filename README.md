@@ -13,14 +13,11 @@ This folder contains the publication-facing code artifacts for the OmniToM bench
 - `benchmark_prompting.py`
   - Shared loader/formatter utilities for benchmark story lookup and table reconstruction.
 - `prompts_extract.py`
-  - Benchmark-facing Stage 1 prompt builder.
-  - Uses the released L3 extraction prompt.
+  - Benchmark-facing extraction prompt builder.
 - `prompts_label.py`
-  - Benchmark-facing Stage 2 prompt builder.
-  - Uses the released L3 labeling prompt.
+  - Benchmark-facing labeling prompt builder.
 - `prompt_evaluate.py`
-  - Benchmark-facing semantic judge prompt builder.
-  - Uses the released L4 judge prompt with the first 3 few-shot examples only.
+  - Benchmark-facing judge prompt builder.
 - `assets/figure2_omnitom_pipeline.png`
   - Framework figure for the README.
 
@@ -50,30 +47,7 @@ judge_system, judge_user = build_evaluation_messages(1, predictions_csv)
 
 ## Prompt Design Notes
 
-- Stage 1 extraction uses only the published L3 extraction prompt.
-- Stage 2 labeling uses only the published L3 labeling prompt.
-- The semantic judge uses the published L4 prompt family with only the first 3 few-shot examples.
+- Extraction uses the released extraction prompt.
+- Labeling uses the released labeling prompt.
+- The judge uses the released judge prompt.
 - The released prompt builders do not depend on the full experiment directories.
-
-## Intentionally Omitted
-
-- experiment outputs
-- notebook artifacts
-- historical run folders
-- analysis plots
-- calibration-only or internal working files
-
-## Dataset Card
-
-- `HF_DATASET_CARD.md`
-  - Anonymous Hugging Face dataset card draft.
-
-## Local Artifact Note
-
-- `BENCHMARK_README.md`
-  - Local artifact note for the JSONL file and statistics.
-  - Keep it local unless you want a second, artifact-level README in the public release.
-
-## License
-
-No final redistribution license is embedded here yet. Keep the release metadata consistent with the dataset card until the license is finalized.
