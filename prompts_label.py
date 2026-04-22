@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 try:
     from .benchmark_prompting import BENCHMARK_PATH, belief_table_pipe, story_category, story_text
 except ImportError:
     from benchmark_prompting import BENCHMARK_PATH, belief_table_pipe, story_category, story_text
 
 
-L3 = """
+PROMPT = """
 You are a Theory of Mind expert whose task is to label a table of actor beliefs, given a narrative, by assigning a label from each of the following closed sets-Order (0/1/2/3), Truth-Status (True/False/Unknown), Knowledge-Access (Private/Shared/Public), Representation (Explicit/Implicit), Content Type (Location, Contents/Physical State, Identity/Relation, Epistemic, Desire/Intention, Emotion, Trait/Value, Action/Event), Mental-Source (Narration, Perception, Memory, Testimony, Inference, Imagination, Unknown), and Context (Deceptive, Temporal, Counterfactual, Neutral)-and outputting only a table with columns Actor and Belief, followed by one column for each labeling set.
 
 In this context, a belief is a minimal proposition expressing what an actor takes to be true about the world or about another actor's mental state. Label each belief in the provided table by assigning values for the following dimensions, using the narrative as evidence:
@@ -60,7 +58,7 @@ def build_label_messages(story_id: int, dataset_path=None) -> tuple[str, str]:
     category = story_category(story_id, dataset_path)
     belief_table = belief_table_pipe(story_id, dataset_path)
 
-    system_prompt = L3
+    system_prompt = PROMPT
     user_prompt = (
         "Given the benchmark story narrative and the benchmark belief table below, label each belief and output only the completed pipe-separated labels table.\n\n"
         + f"Story ID: {int(story_id)}\n"
