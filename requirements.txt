@@ -1,0 +1,9 @@
+# Core dependencies for the public Hugging Face replication path.
+# The mock backend uses only the Python standard library.
+
+torch
+transformers
+accelerate
+
+# Optional: required only when using --load-in-4bit.
+bitsandbytes

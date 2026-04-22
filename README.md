@@ -6,7 +6,7 @@ This release package contains the benchmark dataset, the prompt builders used by
 
 This anonymous release supports replication of the public evaluation workflow reported in the paper only. It does not include the private benchmark-construction or calibration pipeline.
 
-![OmniToM two-stage workflow](assets/figure2_omnitom_pipeline.png)
+<img src="assets/figure2_omnitom_pipeline.png" alt="OmniToM two-stage workflow" width="100%" />
 
 ## Important Notice
 
@@ -72,11 +72,11 @@ The seven schema dimensions are:
 
 The benchmark was built with a human-calibrated, LLM-assisted pipeline. Stories from seven retained ToMBench categories were split into a 21-story calibration subset and an 895-story benchmark subset. The calibration subset was used to validate the extraction, labeling, and semantic-judge setup before fixing the production annotation pipeline.
 
-![OmniToM annotation pipeline](assets/figure3_annotation_pipeline.png)
+<img src="assets/figure3_annotation_pipeline.png" alt="OmniToM annotation pipeline" width="100%" />
 
 The released benchmark contains a broad distribution of schema labels across the seven dimensions.
 
-![OmniToM label distribution statistics](assets/figure4_schema_label_distribution.png)
+<img src="assets/figure4_schema_label_distribution.png" alt="OmniToM label distribution statistics" width="100%" />
 
 ## Included Files
 
@@ -222,6 +222,8 @@ Optional for low-memory or quantized local loading:
 - `bitsandbytes`
 
 The public Hugging Face backend is intended as a lightweight open-source replication path. The paper’s larger open-weight evaluations used 4-bit quantization where required; in this release that behavior is available through `--load-in-4bit`, but environment setup remains the responsibility of the user.
+
+If you want a single install file, use [`requirements.txt`](requirements.txt) in this directory.
 
 ## Output Layout
 
