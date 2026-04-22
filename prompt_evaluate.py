@@ -1,17 +1,15 @@
-from __future__ import annotations
-
 try:
     from .benchmark_prompting import BENCHMARK_PATH, belief_table_csv, story_text
 except ImportError:
     from benchmark_prompting import BENCHMARK_PATH, belief_table_csv, story_text
 
 
-OUTRO = """
+PROMPT_OUTRO = """
 Now output only the 2 tables, explicitly labeled "Prediction Table" and "Ground Truth Table," with an added MatchCount column, formatted as CSV (not markdown), and do not include any other text.
 """.strip()
 
 
-L4 = """
+PROMPT = """
 You are a Theory of Mind evaluation expert whose task is to semantically match rows between two belief tables (Prediction, Ground Truth) extracted from the same short Story Narrative and output only the two tables, explicitly labeled "Prediction Table" and "Ground Truth Table," with an added MatchCount column indicating how many distinct semantically equivalent rows exist in the other table for the same Actor. In this context, a Belief is a minimal statement of what an actor takes to be true about the world (facts/events) or about other actors' mental states, expressed in natural language. Perform the task by following these steps:
 1) If a Story Narrative is provided, use it only to resolve ambiguity (pronouns, aliases, implicit entities) and paraphrase meaning; if no narrative is provided, ignore narrative context entirely. In all cases, do not add rows and do not introduce new beliefs that are not present in either table.
 2) Treat Actors as distinct mental agents and normalize only cosmetic variants of the same Actor name (case/spacing/punctuation and clear shortenings); never merge different Ground Truth Actors.
@@ -316,19 +314,17 @@ FEWSHOT_EXAMPLES = [
 ]
 
 
-def build_eval_prompt(level: str = "L4", fewshots: int = 3) -> str:
-    if level != "L4":
-        raise ValueError("official benchmark judge prompt only supports L4")
+def build_eval_prompt(fewshots: int = 3) -> str:
     if fewshots < 0 or fewshots > len(FEWSHOT_EXAMPLES):
         raise ValueError(f"fewshots must be between 0 and {len(FEWSHOT_EXAMPLES)}")
     if fewshots == 0:
-        return L4
+        return PROMPT
 
     parts = ["Here are examples showing the matching process:\n"]
     for i in range(fewshots):
         inp, out = FEWSHOT_EXAMPLES[i]
         parts.append(f"Example {i + 1}:\n\n{inp}\n{out}")
-    return L4 + "\n\n" + "\n\n".join(parts)
+    return PROMPT + "\n\n" + "\n\n".join(parts)
 
 
 def build_evaluation_messages(
@@ -340,7 +336,7 @@ def build_evaluation_messages(
 ) -> tuple[str, str]:
     groundtruth_csv = belief_table_csv(story_id, dataset_path)
     story = story_text(story_id, dataset_path)
-    system_prompt = build_eval_prompt("L4", fewshots)
+    system_prompt = build_eval_prompt(fewshots)
 
     story_block = ""
     if include_story:
@@ -356,6 +352,6 @@ def build_evaluation_messages(
         + "Ground Truth Table:\n"
         + groundtruth_csv
         + "\n\n"
-        + OUTRO
+        + PROMPT_OUTRO
     )
     return system_prompt, user_prompt
