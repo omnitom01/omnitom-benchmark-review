@@ -1,7 +1,7 @@
 try:
-    from .benchmark_prompting import BENCHMARK_PATH, story_category, story_text
+    from .benchmark_prompting import BENCHMARK_PATH, story_text
 except ImportError:
-    from benchmark_prompting import BENCHMARK_PATH, story_category, story_text
+    from benchmark_prompting import BENCHMARK_PATH, story_text
 
 
 PROMPT = """
@@ -20,13 +20,10 @@ Now output only the pipe-separated table with header: Actor | Belief | Order.
 
 def build_extract_messages(story_id: int, dataset_path=None) -> tuple[str, str]:
     story = story_text(story_id, dataset_path)
-    category = story_category(story_id, dataset_path)
 
     system_prompt = PROMPT
     user_prompt = (
-        "Given the benchmark story narrative below, extract multi-order actor beliefs and output only the pipe-separated table.\n\n"
-        + f"Story ID: {int(story_id)}\n"
-        + f"Story Category: {category}\n\n"
+        "Given the story narrative below, extract multi-order actor beliefs and output only the pipe-separated table.\n\n"
         + "Story Narrative:\n"
         + story
         + "\n\n"

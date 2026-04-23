@@ -2,9 +2,9 @@
 
 OmniToM is a benchmark for evaluating Theory of Mind in language models through explicit belief-structure modeling. Instead of scoring only endpoint answers, OmniToM exposes the intermediate belief structure that a model must construct in order to reason coherently about what different actors know, believe, infer, intend, or misunderstand.
 
-This release package contains the benchmark dataset, the prompt builders used by the public workflow, and a lightweight replication runner for Stage 1 belief extraction, Stage 2 belief labeling, semantic-judge evaluation, and metric aggregation.
+This release package contains the benchmark dataset, a single public prompt set used by the replication workflow, and a lightweight replication runner for Stage 1 belief extraction, Stage 2 belief labeling, semantic-judge evaluation, and metric aggregation.
 
-This anonymous release supports replication of the public evaluation workflow reported in the paper only. It does not include the private benchmark-construction or calibration pipeline.
+This anonymous release supports replication of the public evaluation workflow reported in the paper only. It does not include the private benchmark-construction or calibration pipeline, construction-time prompt metadata, or historical prompt-development variants.
 
 <img src="assets/figure2_omnitom_pipeline.png" alt="OmniToM two-stage workflow" width="100%" />
 
@@ -58,6 +58,8 @@ OmniToM evaluates two linked tasks:
 2. **Belief Labeling**
    Input the story and the released benchmark belief table, then assign a seven-dimensional schema label vector to each belief. This reproduces the standalone Stage 2 evaluation reported in the paper, where Stage 1 and Stage 2 are evaluated independently.
 
+For public replication, Stage 1 and Stage 2 each use one generic released prompt. The extraction prompt consumes only the story narrative, and the labeling prompt consumes only the story narrative plus the released belief table. These public prompts do not inject story IDs, story categories, or other benchmark metadata into the model input. The semantic judge uses a separate matching prompt with optional few-shot examples; those examples are generic matching demonstrations rather than category-specific task prompts.
+
 The seven schema dimensions are:
 
 - `Order`
@@ -85,11 +87,11 @@ The released benchmark contains a broad distribution of schema labels across the
 - `benchmark_prompting.py`
   Helpers for loading stories and reconstructing benchmark tables.
 - `prompts_extract.py`
-  Public Stage 1 extraction prompt builder.
+  Public Stage 1 extraction prompt builder for the single released replication prompt.
 - `prompts_label.py`
-  Public Stage 2 labeling prompt builder.
+  Public Stage 2 labeling prompt builder for the single released replication prompt.
 - `prompt_evaluate.py`
-  Semantic-judge prompt builder.
+  Semantic-judge prompt builder with optional generic few-shot matching examples.
 - `run_replication.py`
   Public end-to-end replication script.
 - `HF_DATASET_CARD.md`

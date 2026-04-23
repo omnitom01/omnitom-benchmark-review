@@ -1,7 +1,7 @@
 try:
-    from .benchmark_prompting import BENCHMARK_PATH, belief_table_pipe, story_category, story_text
+    from .benchmark_prompting import BENCHMARK_PATH, belief_table_pipe, story_text
 except ImportError:
-    from benchmark_prompting import BENCHMARK_PATH, belief_table_pipe, story_category, story_text
+    from benchmark_prompting import BENCHMARK_PATH, belief_table_pipe, story_text
 
 
 PROMPT = """
@@ -55,14 +55,11 @@ Now output only the completed pipe-separated labels table.
 
 def build_label_messages(story_id: int, dataset_path=None) -> tuple[str, str]:
     story = story_text(story_id, dataset_path)
-    category = story_category(story_id, dataset_path)
     belief_table = belief_table_pipe(story_id, dataset_path)
 
     system_prompt = PROMPT
     user_prompt = (
-        "Given the benchmark story narrative and the benchmark belief table below, label each belief and output only the completed pipe-separated labels table.\n\n"
-        + f"Story ID: {int(story_id)}\n"
-        + f"Story Category: {category}\n\n"
+        "Given the story narrative and the belief table below, label each belief and output only the completed pipe-separated labels table.\n\n"
         + "Story Narrative:\n"
         + story
         + "\n\n"
