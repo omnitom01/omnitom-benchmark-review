@@ -1,4 +1,4 @@
-# OmniToM Official Release 
+# OmniToM Official Release
 
 OmniToM is a benchmark for evaluating Theory of Mind in language models through explicit belief-structure modeling. Instead of scoring only endpoint answers, OmniToM exposes the intermediate belief structure that a model must construct in order to reason coherently about what different actors know, believe, infer, intend, or misunderstand.
 
