@@ -6,12 +6,11 @@ license: mit
 task_categories:
 - text-generation
 - text-classification
-- question-answering
 task_ids:
-- information-extraction
-- text-classification
+- text2text-generation
+- multi-class-classification
 size_categories:
-- 1K<n<10K
+- n<1K
 tags:
 - theory-of-mind
 - benchmark
@@ -19,6 +18,7 @@ tags:
 - belief-modeling
 - llm-evaluation
 - cognitive-reasoning
+- mental-state-representation
 ---
 
 # Dataset Card for OmniToM
@@ -27,9 +27,9 @@ tags:
 
 ### Dataset Description
 
-OmniToM is a benchmark for evaluating Theory of Mind in language models through explicit belief-structure modeling. Instead of scoring only endpoint answers to social reasoning questions, OmniToM exposes the intermediate belief structure that a model must build in order to reason coherently about what different actors know, believe, infer, intend, or misunderstand.
+OmniToM is a benchmark for evaluating Theory of Mind in language models through explicit belief-structure modeling. Instead of scoring only endpoint answers to social-reasoning questions, OmniToM exposes the intermediate belief structure that a model must build in order to reason coherently about what different actors know, believe, infer, intend, or misunderstand.
 
-Each example is a short story paired with:
+Each example is a short English story paired with:
 
 - a set of actor-centered belief propositions
 - a reserved `world` actor for narrator/world facts
@@ -43,19 +43,16 @@ The benchmark supports two linked tasks:
    - Given the story and belief tuples, label each belief along seven closed-set schema dimensions.
 
 - **Language(s):** English
-
-### Licensing Information
-
-The upstream ToMBench repository is distributed under the MIT License. OmniToM reuses ToMBench story text and adds new benchmark annotations, prompt builders, release documentation, and replication code. Unless otherwise noted, the OmniToM release package is distributed under the MIT License. Third-party model APIs and hosted services referenced by the public runner are not redistributed.
+- **License:** MIT
 
 ## Uses
 
 ### Direct Use
 
-OmniToM is designed for benchmark evaluation rather than fine-tuning alone. Suitable uses include:
+OmniToM is designed for benchmark evaluation and diagnostic analysis. Suitable uses include:
 
-- zero-shot or few-shot belief extraction
-- zero-shot or few-shot belief labeling
+- zero-shot belief extraction
+- zero-shot belief labeling
 - semantic-judge evaluation of extracted belief tables
 - analysis of multi-actor and higher-order Theory-of-Mind reasoning
 - process-sensitive evaluation beyond endpoint question answering
@@ -67,6 +64,7 @@ OmniToM should not be treated as:
 - a direct measure of real-world social intelligence
 - a measure of embodied, interactive, or multimodal social reasoning
 - a safety certification benchmark for deployed systems
+- a clinical, educational, or psychological assessment tool
 - a complete coverage benchmark for all possible Theory-of-Mind phenomena
 
 ## Dataset Structure
@@ -107,7 +105,7 @@ Each line in the release file is one JSON object:
 - `story`
   - Raw story text used for both extraction and labeling tasks.
 - `beliefs`
-  - List of annotated belief rows.
+  - List of annotated belief propositions.
 - `beliefs[].actor`
   - Belief holder. The reserved actor `world` denotes narrator/world facts.
 - `beliefs[].belief`
@@ -121,27 +119,27 @@ Each line in the release file is one JSON object:
 - `beliefs[].labels.representation`
   - `Explicit` or `Implicit`.
 - `beliefs[].labels.content_type`
-  - One of the closed-set semantic content categories.
+  - One of: `Location`, `Contents/Physical State`, `Identity/Relation`, `Epistemic`, `Desire/Intention`, `Emotion`, `Trait/Value`, `Action/Event`.
 - `beliefs[].labels.mental_source`
-  - One of the closed-set source categories.
+  - One of: `Narration`, `Perception`, `Memory`, `Testimony`, `Inference`, `Imagination`, `Unknown`.
 - `beliefs[].labels.context`
   - `Neutral`, `Temporal`, `Deceptive`, or `Counterfactual`.
 
 ### Data Splits
 
-This release contains the benchmark split only:
+This release contains one benchmark split:
 
-- `benchmark`: `895` stories
+- `train` / benchmark split: `895` stories
 
-A separate 21-story calibration subset is described in the accompanying paper for benchmark construction and judge validation; it is not part of this release artifact.
+The split is named `train` in the Hugging Face dataset viewer for compatibility with the default dataset loading interface. It should be interpreted as the benchmark split, not as a recommended training set.
 
 ## Dataset Creation
 
 ### Curation Rationale
 
-OmniToM was created to address a limitation in prior Theory-of-Mind benchmarks for language models: most focus on endpoint question answering rather than on whether the model actually constructs a coherent internal belief representation while reading the story.
+OmniToM was created to address a limitation in prior Theory-of-Mind benchmarks for language models: most evaluate endpoint question answering rather than whether a model constructs a coherent belief representation while reading the story.
 
-OmniToM instead evaluates explicit belief-structure modeling. The benchmark is grounded in short stories from ToMBench and organizes reasoning around a unified belief-level schema influenced by the ATOMS view of Theory-of-Mind ability space.
+OmniToM instead evaluates explicit belief-structure modeling. The benchmark is grounded in short stories from ToMBench and organizes reasoning around an ATOMS-grounded belief-level schema for fine-grained analysis of mental-state representations.
 
 ### Source Data
 
@@ -161,14 +159,16 @@ The benchmark was built with a human-calibrated, LLM-assisted annotation pipelin
 
 - `1,383` source stories in the original corpus
 - `916` stories retained after source filtering
-- `21` stories reserved for calibration
 - `895` stories released in the final benchmark
+- `22,343` labeled belief propositions in the released benchmark
+- `156,401` total schema labels in the released benchmark
 
 The accompanying paper reports:
 
-- Stage 1 extraction overlap on the calibration subset: `83.72%`
-- Stage 2 exact-match labeling agreement on the calibration subset: `92.21%`
-- Human-judge agreement for the final semantic judge: `88.86%`
+- Stage 1 expert-overlap validation after reconciliation: `83.72%`
+- Stage 2 strict all-annotator exact-match label reliability: `92.23%`
+- Human-human agreement on the semantic-alignment validation set: `88.86%`
+- Human-judge agreement for the selected semantic judge: `72.03%`
 
 ### Who are the source data producers?
 
@@ -176,22 +176,24 @@ The story texts are sourced from ToMBench. The belief structures and schema labe
 
 ### Personal and Sensitive Information
 
-The release consists of short benchmark stories and belief annotations. It is not designed to contain personal user data, private communications, or real-world sensitive records. As with many story-based datasets, names and social roles may appear in the source material, but the benchmark is intended for research evaluation rather than identification or profiling.
+The release consists of short benchmark stories and belief annotations. It is not designed to contain personal user data, private communications, direct identifiers, medical records, or real-world sensitive records. As with many story-based datasets, names, family roles, occupations, emotions, intentions, and social situations may appear in the source material, but the benchmark is intended for research evaluation rather than identification or profiling.
 
 ## Bias, Risks, and Limitations
 
-OmniToM is story-based, text-only, and sourced from a specific upstream benchmark distribution. It therefore reflects the representational biases, writing conventions, and coverage limitations of its source stories. Names, roles, and social scenarios may also be unevenly distributed across categories.
+OmniToM is story-based, text-only, English-language, and sourced from a specific upstream benchmark distribution. It therefore reflects the representational biases, writing conventions, scenario distribution, and coverage limitations of its source stories. Names, roles, social situations, and pragmatic conventions may also be unevenly distributed across categories.
 
 Additional known limitations:
 
-- the benchmark evaluates story-based Theory of Mind rather than interactive or multimodal social reasoning
+- the benchmark evaluates story-based Theory of Mind rather than interactive, embodied, or multimodal social reasoning
+- the retained stories are short and self-contained, and do not stress-test long-horizon information tracking, dense temporal structure, or deeply nested mental states beyond the order-3 schema
 - the released labels come from a human-calibrated LLM-assisted pipeline rather than fully manual annotation of every story
-- some schema dimensions remain partly interpretive, especially `Knowledge Access` and `Representation`
-- Stage 1 extraction evaluation in the paper relies on a validated semantic judge rather than full human adjudication across the full release
+- the seven-dimensional schema is human-labeled and may retain interpretive subjectivity in socially ambiguous cases
+- Stage 1 extraction evaluation in the paper relies on a human-calibrated semantic judge rather than full human adjudication across the full release
+- the selected semantic judge reached `72.03%` agreement with human semantic-alignment decisions, so extraction `F1` should be interpreted as an approximate aggregate metric rather than an exact belief-level alignment score
 
 ### Recommendations
 
-Users should interpret OmniToM as a diagnostic benchmark for explicit belief-structure modeling. Benchmark scores should not be treated as evidence of robust real-world interpersonal reasoning, embodied social competence, or deployment safety.
+Users should interpret OmniToM as a diagnostic benchmark for explicit belief-structure modeling. Benchmark scores should not be treated as evidence of robust real-world interpersonal reasoning, embodied social competence, clinical or educational validity, or deployment safety.
 
 ## Citation
 
