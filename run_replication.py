@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Public replication runner for the OmniToM benchmark release.
+Replication runner for the OmniToM benchmark release.
 
-This script is intentionally simpler than the private experiment pipelines.
-It uses the released `benchmark_story_belief_labels.jsonl` file together with
-the public prompt builders in this folder to run:
+This script uses the released `benchmark_story_belief_labels.jsonl` file
+together with the prompt builders in this folder to run:
 
 1. Stage 1 belief extraction
 2. Stage 2 belief labeling
@@ -13,8 +12,8 @@ the public prompt builders in this folder to run:
 
 The default `mock` backend makes it easy to smoke-test the full pipeline
 without model access. A lightweight Hugging Face backend is also included for
-open-source replication. If you want to plug in a closed-source API, the place
-to extend is `GenerationBackend.generate_text()`.
+open-weight replication, and the API backend supports the GPT-5 judge setup
+used for the OmniToM Stage 1 results.
 """
 
 from __future__ import annotations
@@ -253,6 +252,20 @@ def rows_to_csv_text(rows: Sequence[dict], headers: Sequence[str]) -> str:
     for row in rows:
         writer.writerow({h: normalize_space(row.get(h, "")) for h in headers})
     return buffer.getvalue().strip()
+
+
+def rows_to_belief_csv_text(rows: Sequence[dict]) -> str:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=["Actor", "Belief"], lineterminator="\n")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(
+            {
+                "Actor": normalize_space(row.get("Actor", row.get("actor", ""))),
+                "Belief": normalize_space(row.get("Belief", row.get("belief", ""))),
+            }
+        )
+    return buffer.getvalue()
 
 
 def parse_pipe_table(text: str) -> List[List[str]]:
@@ -527,9 +540,7 @@ class GenerationBackend:
     The included backends are:
     - `mock`: deterministic smoke testing
     - `hf`: lightweight Hugging Face text generation
-
-    If you want to reproduce the closed-source experiments, this is the single
-    extension point to adapt to your API client.
+    - `api`: OpenAI-compatible Responses API and Google GenAI calls
     """
 
     def generate_text(
@@ -761,6 +772,173 @@ class HuggingFaceBackend(GenerationBackend):
         self.current_model_id = None
 
 
+class APIBackend(GenerationBackend):
+    def __init__(
+        self,
+        *,
+        api_provider: str,
+        default_model: Optional[str],
+        extract_model: Optional[str],
+        label_model: Optional[str],
+        judge_model: Optional[str],
+        max_new_tokens: int,
+        temperature: float,
+        api_key_env: Optional[str],
+        api_base_url_env: Optional[str],
+    ) -> None:
+        self.api_provider = (api_provider or "").strip().lower()
+        self.default_model = (default_model or "").strip() or None
+        self.stage_models = {
+            "extract": (extract_model or "").strip() or self.default_model,
+            "label": (label_model or "").strip() or self.default_model,
+            "judge": (judge_model or "").strip() or self.default_model,
+        }
+        self.max_new_tokens = int(max_new_tokens)
+        self.temperature = float(temperature)
+        self.api_key_env = (api_key_env or "").strip() or None
+        self.api_base_url_env = (api_base_url_env or "").strip() or None
+
+        if self.api_provider not in {"openai", "google_genai"}:
+            raise ValueError("--api-provider must be one of: openai, google_genai")
+
+    def _resolve_model(self, stage: str) -> str:
+        model_id = self.stage_models.get(stage)
+        if not model_id:
+            raise ValueError(
+                f"No model configured for stage '{stage}'. Use --model or the stage-specific "
+                f"flag (for example --{stage}-model)."
+            )
+        return model_id
+
+    def _api_key(self) -> str:
+        candidates: List[str]
+        if self.api_key_env:
+            candidates = [self.api_key_env]
+        elif self.api_provider == "openai":
+            candidates = ["OPENAI_API_KEY"]
+        else:
+            candidates = ["GOOGLE_API_KEY", "GEMINI_API_KEY"]
+
+        for env_name in candidates:
+            value = os.getenv(env_name, "").strip()
+            if value:
+                return value
+        raise RuntimeError(f"Missing API key. Set one of: {', '.join(candidates)}")
+
+    def _api_base_url(self) -> Optional[str]:
+        candidates: List[str]
+        if self.api_base_url_env:
+            candidates = [self.api_base_url_env]
+        elif self.api_provider == "openai":
+            candidates = ["OPENAI_BASE_URL"]
+        else:
+            candidates = []
+
+        for env_name in candidates:
+            value = os.getenv(env_name, "").strip().rstrip("/")
+            if value:
+                return value
+        return None
+
+    @staticmethod
+    def _openai_output_text(response: object) -> str:
+        output_text = getattr(response, "output_text", None)
+        if isinstance(output_text, str) and output_text.strip():
+            return output_text.strip()
+
+        output = getattr(response, "output", None)
+        parts: List[str] = []
+        if isinstance(output, list):
+            for item in output:
+                if isinstance(item, dict):
+                    content = item.get("content")
+                else:
+                    content = getattr(item, "content", None)
+                if isinstance(content, str):
+                    parts.append(content)
+                elif isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict):
+                            text = block.get("text")
+                        else:
+                            text = getattr(block, "text", None)
+                        if isinstance(text, str):
+                            parts.append(text)
+        return "\n".join(part for part in parts if part).strip()
+
+    def _generate_openai(self, model_id: str, system_prompt: str, user_prompt: str) -> str:
+        try:
+            from openai import OpenAI
+        except Exception as exc:
+            raise RuntimeError("The API backend with --api-provider openai requires `openai`.") from exc
+
+        base_url = self._api_base_url()
+        client_kwargs = {"api_key": self._api_key()}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        client = OpenAI(**client_kwargs)
+
+        request = {
+            "model": model_id,
+            "instructions": system_prompt,
+            "input": user_prompt,
+            "max_output_tokens": int(self.max_new_tokens),
+            "temperature": float(self.temperature),
+        }
+        if "gpt-5" in model_id.lower():
+            request["reasoning"] = {"effort": "low"}
+
+        response = client.responses.create(**request)
+        text = self._openai_output_text(response)
+        if not text:
+            raise RuntimeError("Empty model response. Increase --max-new-tokens for this run.")
+        return text
+
+    def _generate_google_genai(self, model_id: str, system_prompt: str, user_prompt: str) -> str:
+        try:
+            from google import genai
+            from google.genai import types
+        except Exception as exc:
+            raise RuntimeError("The API backend with --api-provider google_genai requires `google-genai`.") from exc
+
+        client = genai.Client(api_key=self._api_key())
+        thinking_config = None
+        try:
+            thinking_config = types.ThinkingConfig(include_thoughts=False, thinking_budget=0)
+        except Exception:
+            thinking_config = None
+
+        config = types.GenerateContentConfig(
+            system_instruction=[system_prompt.strip()] if system_prompt.strip() else None,
+            temperature=float(self.temperature),
+            max_output_tokens=int(self.max_new_tokens),
+            thinking_config=thinking_config,
+        )
+        response = client.models.generate_content(
+            model=model_id,
+            contents=user_prompt,
+            config=config,
+        )
+        text = (getattr(response, "text", None) or "").strip()
+        if not text:
+            raise RuntimeError("Empty model response. Increase --max-new-tokens for this run.")
+        return text
+
+    def generate_text(
+        self,
+        *,
+        stage: str,
+        system_prompt: str,
+        user_prompt: str,
+        record: dict,
+        extraction_rows: Optional[Sequence[dict]] = None,
+    ) -> str:
+        model_id = self._resolve_model(stage)
+        if self.api_provider == "openai":
+            return self._generate_openai(model_id, system_prompt, user_prompt)
+        return self._generate_google_genai(model_id, system_prompt, user_prompt)
+
+
 def build_backend(args: argparse.Namespace) -> GenerationBackend:
     if args.backend == "mock":
         return MockBackend()
@@ -774,6 +952,18 @@ def build_backend(args: argparse.Namespace) -> GenerationBackend:
             max_new_tokens=args.max_new_tokens,
             load_in_4bit=args.load_in_4bit,
             bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+        )
+    if args.backend == "api":
+        return APIBackend(
+            api_provider=args.api_provider,
+            default_model=args.model,
+            extract_model=args.extract_model,
+            label_model=args.label_model,
+            judge_model=args.judge_model,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            api_key_env=args.api_key_env,
+            api_base_url_env=args.api_base_url_env,
         )
     raise ValueError(f"Unsupported backend: {args.backend}")
 
@@ -856,7 +1046,7 @@ def run_judge(
     if paths["judge_pred_csv"].exists() and paths["judge_gt_csv"].exists() and not args.overwrite:
         return read_rows_csv(paths["judge_pred_csv"]), read_rows_csv(paths["judge_gt_csv"])
 
-    predictions_csv = rows_to_csv_text(extraction_rows, EXTRACTION_COLUMNS[:2])
+    predictions_csv = rows_to_belief_csv_text(extraction_rows)
     system_prompt, user_prompt = build_evaluation_messages(
         story_id,
         predictions_csv,
@@ -1056,12 +1246,15 @@ def write_manifest(output_dir: Path, args: argparse.Namespace, records: Sequence
         "include_story_context": not args.no_story_context,
         "load_in_4bit": args.load_in_4bit,
         "bnb_4bit_compute_dtype": args.bnb_4bit_compute_dtype,
+        "api_provider": args.api_provider,
+        "temperature": args.temperature,
+        "max_new_tokens": args.max_new_tokens,
     }
     write_text(output_dir / "manifest.json", json.dumps(manifest, indent=2))
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Public OmniToM replication runner")
+    parser = argparse.ArgumentParser(description="OmniToM replication runner")
     parser.add_argument(
         "--dataset-path",
         type=Path,
@@ -1076,16 +1269,35 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--backend",
-        choices=["mock", "hf"],
+        choices=["mock", "hf", "api"],
         default="mock",
-        help="Model backend. `mock` is useful for smoke tests; `hf` runs local Hugging Face models.",
+        help="Model backend. `mock` is for smoke tests; `hf` runs local Hugging Face models; `api` runs OpenAI-compatible or Gemini API models.",
     )
-    parser.add_argument("--model", type=str, default=None, help="Default model id for all stages when using --backend hf")
-    parser.add_argument("--extract-model", type=str, default=None, help="Stage 1 extraction model id for --backend hf")
-    parser.add_argument("--label-model", type=str, default=None, help="Stage 2 labeling model id for --backend hf")
-    parser.add_argument("--judge-model", type=str, default=None, help="Judge model id for --backend hf")
+    parser.add_argument("--model", type=str, default=None, help="Default model id for all stages")
+    parser.add_argument("--extract-model", type=str, default=None, help="Stage 1 extraction model id")
+    parser.add_argument("--label-model", type=str, default=None, help="Stage 2 labeling model id")
+    parser.add_argument("--judge-model", type=str, default=None, help="Semantic judge model id")
     parser.add_argument("--device", type=str, default="auto", help="HF device target, for example auto, cpu, cuda")
-    parser.add_argument("--max-new-tokens", type=int, default=2048, help="Maximum generated tokens per call for --backend hf")
+    parser.add_argument("--max-new-tokens", type=int, default=6000, help="Maximum generated tokens per model call")
+    parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature for model calls")
+    parser.add_argument(
+        "--api-provider",
+        choices=["openai", "google_genai"],
+        default="openai",
+        help="Provider for --backend api. Use openai for GPT-5/OpenAI-compatible Responses API models.",
+    )
+    parser.add_argument(
+        "--api-key-env",
+        type=str,
+        default=None,
+        help="Environment variable containing the API key. Defaults to OPENAI_API_KEY for openai and GOOGLE_API_KEY/GEMINI_API_KEY for google_genai.",
+    )
+    parser.add_argument(
+        "--api-base-url-env",
+        type=str,
+        default=None,
+        help="Optional environment variable containing an OpenAI-compatible base URL.",
+    )
     parser.add_argument(
         "--load-in-4bit",
         action="store_true",
@@ -1104,7 +1316,7 @@ def parse_args() -> argparse.Namespace:
         "--judge-fewshots",
         type=int,
         default=3,
-        help="Few-shot example count for the public semantic judge prompt",
+        help="Few-shot example count for the semantic judge prompt (0-3; paper setting is 3)",
     )
     parser.add_argument("--no-story-context", action="store_true", help="Omit the narrative from judge prompts")
     parser.add_argument(
@@ -1137,17 +1349,18 @@ def main() -> int:
     try:
         extraction_cache: Dict[int, List[dict]] = {}
 
-        if "extract" in args.stages or "judge" in args.stages:
+        if "extract" in args.stages:
             for record in records:
                 story_id = int(record["story_id"])
                 extraction_cache[story_id] = run_extraction(record, backend, args.output_dir, args)
-        else:
+        elif "judge" in args.stages:
             for record in records:
                 story_id = int(record["story_id"])
                 cached = maybe_load_rows(stage_paths(args.output_dir, story_id)["extract_csv"])
                 if cached is None:
                     raise FileNotFoundError(
-                        f"Missing extraction CSV for story {story_id} in metrics-only mode: "
+                        f"Missing extraction CSV for story {story_id}. Run --stages extract first, or include "
+                        f"extract in this run: "
                         f"{stage_paths(args.output_dir, story_id)['extract_csv']}"
                     )
                 extraction_cache[story_id] = cached

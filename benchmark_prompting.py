@@ -1,4 +1,6 @@
 import json
+import csv
+import io
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List
@@ -61,9 +63,9 @@ def belief_table_pipe(story_id: int, dataset_path: str | Path | None = None) -> 
 
 
 def belief_table_csv(story_id: int, dataset_path: str | Path | None = None) -> str:
-    lines = ["Actor,Belief"]
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=["Actor", "Belief"], lineterminator="\n")
+    writer.writeheader()
     for row in actor_belief_rows(story_id, dataset_path):
-        actor = row["actor"].replace('"', '""')
-        belief = row["belief"].replace('"', '""')
-        lines.append(f'"{actor}","{belief}"')
-    return "\n".join(lines)
+        writer.writerow({"Actor": row["actor"], "Belief": row["belief"]})
+    return buffer.getvalue()

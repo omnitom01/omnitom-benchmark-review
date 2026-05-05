@@ -5,12 +5,12 @@ except ImportError:
 
 
 PROMPT = """
-You are a Theory of Mind expert whose task is to label a table of actor beliefs, given a narrative, by assigning a label from each of the following closed sets-Order (0/1/2/3), Truth-Status (True/False/Unknown), Knowledge-Access (Private/Shared/Public), Representation (Explicit/Implicit), Content Type (Location, Contents/Physical State, Identity/Relation, Epistemic, Desire/Intention, Emotion, Trait/Value, Action/Event), Mental-Source (Narration, Perception, Memory, Testimony, Inference, Imagination, Unknown), and Context (Deceptive, Temporal, Counterfactual, Neutral)-and outputting only a table with columns Actor and Belief, followed by one column for each labeling set.
+You are a Theory of Mind expert whose task is to label a table of actor beliefs, given a narrative, by assigning a label from each of the following closed sets—Order (0/1/2/3), Truth-Status (True/False/Unknown), Knowledge-Access (Private/Shared/Public), Representation (Explicit/Implicit), Content Type (Location, Contents/Physical State, Identity/Relation, Epistemic, Desire/Intention, Emotion, Trait/Value, Action/Event), Mental-Source (Narration, Perception, Memory, Testimony, Inference, Imagination, Unknown), and Context (Deceptive, Temporal, Counterfactual, Neutral)—and outputting only a table with columns Actor and Belief, followed by one column for each labeling set.
 
-In this context, a belief is a minimal proposition expressing what an actor takes to be true about the world or about another actor's mental state. Label each belief in the provided table by assigning values for the following dimensions, using the narrative as evidence:
+In this context, a belief is a minimal proposition expressing what an actor takes to be true about the world or about another actor’s mental state. Label each belief in the provided table by assigning values for the following dimensions, using the narrative as evidence:
 
 1. Determine the Order of the belief, which captures the depth of belief reasoning:
-   - Order 0: Narrator- or world-level facts that anchor the story's ground truth and are not held by any actor.
+   - Order 0: Narrator- or world-level facts that anchor the story’s ground truth and are not held by any actor.
    - Order 1: First-order beliefs (A believes p).
    - Order 2: Second-order beliefs (A believes B believes p).
    - Order 3: Higher-order recursive beliefs (A believes B believes C believes p).
@@ -31,9 +31,9 @@ In this context, a belief is a minimal proposition expressing what an actor take
 
 5. Determine the Content Type by identifying what the proposition is about:
    - Use Action/Event for happenings; Desire/Intention for plans or goals.
-   - Use Location when the proposition concerns where an entity is or was, even if it involves a container.
-   - Use Contents / Physical State only when the belief concerns what a container holds or an object's condition.
-   - Use Epistemic for beliefs about beliefs, knowledge, attention, or awareness.
+   - Use Location when the proposition concerns where an entity is or was, even if it involves a container
+   - Use Contents / Physical State only when the belief concerns what a container holds or an object’s condition.
+   - Use Epistemic for beliefs about beliefs, knowledge, attention, or awareness..
 
 6. Determine the Mental-Source of the belief, indicating how it was acquired:
    - Narration (Order 0 only), Perception, Memory, Testimony, Inference, Imagination, or Unknown.
@@ -49,7 +49,7 @@ In this context, a belief is a minimal proposition expressing what an actor take
 
 
 OUTRO = """
-Now output only the completed pipe-separated labels table.
+Now output only the completed table for the provided story.
 """.strip()
 
 
